@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"os"
 
-	"template/cmd/version"
+	"github.com/matthiasharzer/livestream-snapshot-tool/cmd/version"
 
 	"github.com/spf13/cobra"
 )
 
 var rootCommand = &cobra.Command{
-	Use: "<tool-name>",
+	Use: "livestream-snapshot-tool",
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		return cmd.Help()
 	},
@@ -23,7 +23,7 @@ func init() {
 func main() {
 	err := rootCommand.Execute()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }

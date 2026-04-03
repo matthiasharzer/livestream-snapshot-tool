@@ -1,4 +1,4 @@
-module template
+module github.com/matthiasharzer/livestream-snapshot-tool
 
 go 1.26.0
 
