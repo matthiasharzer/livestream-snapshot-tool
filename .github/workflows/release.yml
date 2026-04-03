@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - "main"
+
+permissions:
+    contents: write
+    packages: write
+
+
+jobs:
+  get-next-version:
+    name: Get next version
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      hasNextVersion: ${{ steps.get-next-version.outputs.hasNextVersion }}
+      version: ${{ steps.get-next-version.outputs.version }}
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Get next version
+        id: get-next-version
+        uses: thenativeweb/get-next-version@2.7.1
+
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: get-next-version
+
+    # Don't run just after creating repo from template
+    if: github.run_number != 1 && needs.get-next-version.outputs.hasNextVersion == 'true'
+
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v6
+      - name: Use Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: ./go.mod
+      - name: Run QA
+        run: |
+          make qa
+      - name: Create new version
+        run: |
+          git tag v${{needs.get-next-version.outputs.version}}
+          git push origin v${{needs.get-next-version.outputs.version}}
+      - name: Build artifacts
+        run: |
+          make build BUILD_VERSION=${{ needs.get-next-version.outputs.version }}
+      - name: Release new version
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "build/*"
+          tag: v${{ needs.get-next-version.outputs.version }}
+          generateReleaseNotes: true
+
