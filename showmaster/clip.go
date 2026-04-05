@@ -43,3 +43,20 @@ func (c *Clip) CopyTo(filePath string) error {
 	_, err = io.Copy(destFile, srcFile)
 	return err
 }
+
+func (c *Clip) Clear() error {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
+	if c.Path == "" {
+		return nil
+	}
+
+	err := os.Remove(c.Path)
+	if err != nil {
+		return err
+	}
+
+	c.Path = ""
+	return nil
+}

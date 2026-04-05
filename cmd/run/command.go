@@ -62,7 +62,11 @@ var Command = &cobra.Command{
 				logging.Error("error processing segment: %v", err)
 				return
 			}
-			master.LatestClip.SetPath(filePath)
+			err = master.AddClip(filePath)
+			if err != nil {
+				logging.Error("failed to add clip to master: %v", err)
+			}
+			logging.Info("clip added to master", "filePath", filePath)
 		}
 
 		ripper := stream.NewRipper(*streamURL, interval, outDir, onSegment)
