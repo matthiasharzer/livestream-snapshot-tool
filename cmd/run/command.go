@@ -55,7 +55,6 @@ var Command = &cobra.Command{
 		defer cleanup()
 
 		master := showmaster.New()
-		master.LatestClip.SetPath("daniel.mp4")
 
 		onSegment := func(filePath string, err error) {
 			if err != nil {
