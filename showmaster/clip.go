@@ -1,8 +1,6 @@
 package showmaster
 
 import (
-	"bytes"
-	"errors"
 	"io"
 	"os"
 	"sync"
@@ -20,20 +18,28 @@ func (c *Clip) SetPath(path string) {
 	c.Path = path
 }
 
-func (c *Clip) Reader() (io.ReadCloser, error) {
+func (c *Clip) GetPath() string {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+	return c.Path
+}
+
+func (c *Clip) CopyTo(filePath string) error {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
 
-	if c.Path == "" {
-		return nil, errors.New("no clip path set")
-	}
-
-	file, err := os.ReadFile(c.Path)
+	srcFile, err := os.Open(c.Path)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	defer srcFile.Close()
 
-	reader := bytes.NewReader(file)
+	destFile, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
 
-	return io.NopCloser(reader), nil
+	_, err = io.Copy(destFile, srcFile)
+	return err
 }

@@ -1,11 +1,11 @@
 package showmaster
 
 type ShowMaster struct {
-	LatestClip Clip
+	LatestClip *Clip
 }
 
 func New() *ShowMaster {
 	return &ShowMaster{
-		LatestClip: Clip{},
+		LatestClip: &Clip{},
 	}
 }

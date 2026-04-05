@@ -76,7 +76,7 @@ var Command = &cobra.Command{
 
 		logging.Info("starting livestream snapshot server", "host", httpHost, "port", httpPort)
 		mux := http.NewServeMux()
-		mux.HandleFunc("GET /api/v1/latest", latestclip.Handler(master))
+		mux.HandleFunc("GET /api/v1/latest", latestclip.Handler(master.LatestClip))
 
 		err = http.ListenAndServe(addr, mux)
 		if err != nil {

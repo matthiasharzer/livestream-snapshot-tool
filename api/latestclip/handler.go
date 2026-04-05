@@ -1,29 +1,33 @@
 package latestclip
 
 import (
-	"io"
 	"net/http"
 
 	"github.com/matthiasharzer/livestream-snapshot-tool/showmaster"
+	"github.com/matthiasharzer/livestream-snapshot-tool/util/fsutil"
 )
 
-func Handler(master *showmaster.ShowMaster) http.HandlerFunc {
+func Handler(latestClip *showmaster.Clip) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		clipReader, err := master.LatestClip.Reader()
-		if err != nil {
-			http.Error(w, "Failed to get latest clip", http.StatusInternalServerError)
+		clipPath := latestClip.GetPath()
+		if clipPath == "" {
+			http.Error(w, "no clip available", http.StatusNotFound)
 			return
 		}
-		defer func() {
-			_ = clipReader.Close()
-		}()
 
-		w.Header().Set("Content-Type", "video/mp4")
-
-		_, err = io.Copy(w, clipReader)
+		tempFile, cleanup, err := fsutil.TemporaryFile()
 		if err != nil {
-			http.Error(w, "Failed to stream latest clip", http.StatusInternalServerError)
+			http.Error(w, "failed to create temporary file", http.StatusInternalServerError)
 			return
 		}
+		defer cleanup()
+
+		err = latestClip.CopyTo(tempFile)
+		if err != nil {
+			http.Error(w, "failed to copy clip to temporary file", http.StatusInternalServerError)
+			return
+		}
+
+		http.ServeFile(w, r, tempFile)
 	}
 }
