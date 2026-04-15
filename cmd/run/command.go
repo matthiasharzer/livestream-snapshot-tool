@@ -58,12 +58,12 @@ var Command = &cobra.Command{
 
 		onSegment := func(filePath string, err error) {
 			if err != nil {
-				logging.Error("error processing segment: %v", err)
+				logging.Error("error processing segment", "err", err)
 				return
 			}
 			err = master.AddClip(filePath)
 			if err != nil {
-				logging.Error("failed to add clip to master: %v", err)
+				logging.Error("failed to add clip to master", "err", err)
 			}
 			logging.Info("clip added to master", "filePath", filePath)
 		}

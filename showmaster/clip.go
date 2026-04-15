@@ -12,51 +12,39 @@ type Clip struct {
 	mutex sync.RWMutex
 }
 
-func (c *Clip) SetPath(path string) {
+func (c *Clip) ReplacePath(newPath string) (oldPath string) {
 	c.mutex.Lock()
 	defer c.mutex.Unlock()
-	c.Path = path
+
+	oldPath = c.Path
+	c.Path = newPath
+	return oldPath
 }
 
-func (c *Clip) GetPath() string {
+func (c *Clip) CopyTo(filePath string) (bool, error) {
 	c.mutex.RLock()
 	defer c.mutex.RUnlock()
-	return c.Path
-}
 
-func (c *Clip) CopyTo(filePath string) error {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
+	if c.Path == "" {
+		return false, nil
+	}
 
 	srcFile, err := os.Open(c.Path)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer srcFile.Close()
 
 	destFile, err := os.Create(filePath)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer destFile.Close()
 
 	_, err = io.Copy(destFile, srcFile)
-	return err
-}
-
-func (c *Clip) Clear() error {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	if c.Path == "" {
-		return nil
-	}
-
-	err := os.Remove(c.Path)
 	if err != nil {
-		return err
+		return false, err
 	}
 
-	c.Path = ""
-	return nil
+	return true, nil
 }

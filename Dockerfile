@@ -1,4 +1,4 @@
-FROM golang:1.26.0-alpine3.23 as build
+FROM golang:1.26.2-alpine3.23 AS build
 
 ARG version
 
@@ -20,10 +20,13 @@ COPY . .
 
 RUN go build  \
     -o ../bin/livestream-snapshot-tool \
-    -ldflags "-X github.com/matthiasharzer/livestream-snapshot-tool/cmd/version.version=$version"  \
+    -ldflags "-X github.com/matthiasharzer/livestream-snapshotting-tool/cmd/version.version=$version"  \
     ./main.go
 
 FROM alpine:3.23
+
+RUN apk update && \
+		apk add --no-cache ffmpeg yt-dlp
 
 COPY --from=build /go/bin/livestream-snapshot-tool /usr/local/bin/livestream-snapshot-tool
 

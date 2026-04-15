@@ -99,6 +99,8 @@ func (r *Ripper) loop(ctx context.Context) {
 			}
 		}
 
-		go r.Callback(outPath, err)
+		if r.Callback != nil {
+			go r.Callback(outPath, err)
+		}
 	}
 }
