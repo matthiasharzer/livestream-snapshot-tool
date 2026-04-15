@@ -1,4 +1,4 @@
-module github.com/matthiasharzer/livestream-snapshot-tool
+module github.com/matthiasharzer/livestream-snapshotting-tool
 
 go 1.26.0
 

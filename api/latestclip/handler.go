@@ -3,8 +3,8 @@ package latestclip
 import (
 	"net/http"
 
-	"github.com/matthiasharzer/livestream-snapshot-tool/showmaster"
-	"github.com/matthiasharzer/livestream-snapshot-tool/util/fsutil"
+	"github.com/matthiasharzer/livestream-snapshotting-tool/showmaster"
+	"github.com/matthiasharzer/livestream-snapshotting-tool/util/fsutil"
 )
 
 func Handler(latestClip *showmaster.Clip) http.HandlerFunc {
