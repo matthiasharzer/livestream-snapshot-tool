@@ -22,8 +22,8 @@ func (c *Clip) ReplacePath(newPath string) (oldPath string) {
 }
 
 func (c *Clip) CopyTo(filePath string) (bool, error) {
-	c.mutex.RLock()
-	defer c.mutex.RUnlock()
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 
 	if c.Path == "" {
 		return false, nil
