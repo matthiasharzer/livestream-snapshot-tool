@@ -34,7 +34,7 @@ func init() {
 
 var Command = &cobra.Command{
 	Use:   "run",
-	Short: "Run the livestream snapshot server",
+	Short: "Run the livestream snapshotting server",
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		if intervalMinutes <= 0 {
 			return errors.New("interval must be a positive integer")
