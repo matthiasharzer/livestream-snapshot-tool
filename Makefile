@@ -1,6 +1,6 @@
 BUILD_VERSION ?= "unknown"
 
-OUTPUT_NAME := "livestream-snapshot-tool"
+OUTPUT_NAME := "livestream-snapshotting-tool"
 MODULE_NAME := $(shell go list -m)
 
 clean:
