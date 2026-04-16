@@ -62,7 +62,10 @@ var Command = &cobra.Command{
 		}
 		defer cleanup()
 
-		master := showmaster.New(historySize)
+		master, err := showmaster.New(historySize)
+		if err != nil {
+			return fmt.Errorf("failed to create show master: %w", err)
+		}
 
 		onSegment := func(filePath string, err error) {
 			if err != nil {
