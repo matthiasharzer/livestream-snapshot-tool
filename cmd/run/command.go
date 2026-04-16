@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/matthiasharzer/livestream-snapshotting-tool/api/latestclip"
+	"github.com/matthiasharzer/livestream-snapshotting-tool/api/clip"
 	"github.com/matthiasharzer/livestream-snapshotting-tool/logging"
 	"github.com/matthiasharzer/livestream-snapshotting-tool/showmaster"
 	"github.com/matthiasharzer/livestream-snapshotting-tool/stream"
@@ -19,6 +19,7 @@ var streamURLString string
 var intervalMinutes int
 var httpPort int
 var httpHost string
+var historySize int
 
 func init() {
 	Command.Flags().StringVarP(&streamURLString, "url", "u", "", "URL of the livestream to snapshot (required)")
@@ -30,6 +31,7 @@ func init() {
 	Command.Flags().IntVarP(&intervalMinutes, "interval", "i", 10, "Interval in minutes between snapshots")
 	Command.Flags().IntVarP(&httpPort, "port", "p", 8080, "HTTP server port")
 	Command.Flags().StringVarP(&httpHost, "host", "", "", "HTTP server host (default: all interfaces)")
+	Command.Flags().IntVarP(&historySize, "history-size", "", 1, "Number of historical clips to keep")
 }
 
 var Command = &cobra.Command{
@@ -38,6 +40,12 @@ var Command = &cobra.Command{
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		if intervalMinutes <= 0 {
 			return errors.New("interval must be a positive integer")
+		}
+		if httpPort <= 0 || httpPort > 65535 {
+			return errors.New("port must be a valid TCP port number")
+		}
+		if historySize < 1 {
+			return errors.New("history size must be at least 1")
 		}
 		return nil
 	},
@@ -54,7 +62,10 @@ var Command = &cobra.Command{
 		}
 		defer cleanup()
 
-		master := showmaster.New()
+		master, err := showmaster.New(historySize)
+		if err != nil {
+			return fmt.Errorf("failed to create show master: %w", err)
+		}
 
 		onSegment := func(filePath string, err error) {
 			if err != nil {
@@ -79,7 +90,7 @@ var Command = &cobra.Command{
 
 		logging.Info("starting livestream snapshot server", "host", httpHost, "port", httpPort)
 		mux := http.NewServeMux()
-		mux.HandleFunc("GET /api/v1/latest", latestclip.Handler(master.LatestClip))
+		mux.HandleFunc("GET /api/v1/clip/{clip}", clip.Handler(master))
 
 		err = http.ListenAndServe(addr, mux)
 		if err != nil {
