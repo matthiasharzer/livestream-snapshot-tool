@@ -44,13 +44,14 @@ Start the tool with:
 ./livestream-snapshotting-tool run --port 4000 --interval 60 --history-size 24 --url https://www.youtube.com/watch?v=W0V8-6WrgBY
 ```
 
-| Flag                | Required | Default               | Description                                                     |
-|---------------------|----------|-----------------------|-----------------------------------------------------------------|
-| `-u` / `--url`      | ✅       | /                     | The URL of the livestream to snapshot.                          |
-| `-p` / `--port`     | ❌       | 4000                  | The port on which the REST API will be available.               |
-| `--host`            | ❌       | `""` (all interfaces) | The host/IP address on which the REST API will listen.          |
-| `-i` / `--interval` | ❌       | 10                    | The interval (in minutes) at which to snapshot the livestream.  |
-| `--history-size`    | ❌       | 1                     | The number of snapshots to keep in history. Must be `>=1`       |
+| Flag                | Required | Default               | Description                                                                                                                                                                                                                                      |
+|---------------------|----------|-----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `-u` / `--url`      | ✅       | /                     | The URL of the livestream to snapshot.                                                                                                                                                                                                           |
+| `-p` / `--port`     | ❌       | 4000                  | The port on which the REST API will be available.                                                                                                                                                                                                |
+| `--host`            | ❌       | `""` (all interfaces) | The host/IP address on which the REST API will listen.                                                                                                                                                                                           |
+| `-i` / `--interval` | ❌       | 10                    | The interval (in minutes) at which to snapshot the livestream.                                                                                                                                                                                   |
+| `--history-size`    | ❌       | 1                     | The number of snapshots to keep in history. Must be `>=1`                                                                                                                                                                                        |
+| `--cookies-file`    | ❌       | `""`                  | Path to a cookies file (in Netscape format) for authenticated access. Will be passed as the `--cookies` flag to `yt-dlp`. See the [`yt-dlp` FAQ](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp) for further details. |
 
 ## API Endpoints
 - `GET /api/v1/clip/{clip}`: Returns the n-th most recent snapshot, where `clip=0` is the most recent. Use instead `clip=latest` to always get the most recent snapshot. Returns the video clip in MP4 format.

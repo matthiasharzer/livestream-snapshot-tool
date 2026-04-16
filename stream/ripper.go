@@ -25,14 +25,16 @@ type Ripper struct {
 	mu         sync.Mutex
 	cancelFunc context.CancelFunc
 	isRunning  bool
+	cookieFile string
 }
 
-func NewRipper(url url.URL, interval time.Duration, outDir string, cb SegmentCallback) *Ripper {
+func NewRipper(url url.URL, interval time.Duration, outDir string, cb SegmentCallback, cookieFile string) *Ripper {
 	return &Ripper{
-		URL:       url,
-		Interval:  interval,
-		OutputDir: outDir,
-		Callback:  cb,
+		URL:        url,
+		Interval:   interval,
+		OutputDir:  outDir,
+		Callback:   cb,
+		cookieFile: cookieFile,
 	}
 }
 
@@ -86,6 +88,9 @@ func (r *Ripper) loop(ctx context.Context) {
 			"--merge-output-format", "mp4",
 			"-o", outPath,
 		)
+		if r.cookieFile != "" {
+			cmd.Args = append(cmd.Args, "--cookies", r.cookieFile)
+		}
 
 		err := cmd.Run()
 
