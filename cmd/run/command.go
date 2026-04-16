@@ -29,7 +29,7 @@ func init() {
 	}
 
 	Command.Flags().IntVarP(&intervalMinutes, "interval", "i", 10, "Interval in minutes between snapshots")
-	Command.Flags().IntVarP(&httpPort, "port", "p", 8080, "HTTP server port")
+	Command.Flags().IntVarP(&httpPort, "port", "p", 4000, "HTTP server port")
 	Command.Flags().StringVarP(&httpHost, "host", "", "", "HTTP server host (default: all interfaces)")
 	Command.Flags().IntVarP(&historySize, "history-size", "", 1, "Number of historical clips to keep")
 }
