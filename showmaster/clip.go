@@ -12,13 +12,8 @@ type Clip struct {
 	mutex sync.RWMutex
 }
 
-func (c *Clip) ReplacePath(newPath string) (oldPath string) {
-	c.mutex.Lock()
-	defer c.mutex.Unlock()
-
-	oldPath = c.Path
-	c.Path = newPath
-	return oldPath
+func NewClip(path string) (*Clip, error) {
+	return &Clip{Path: path}, nil
 }
 
 func (c *Clip) CopyTo(filePath string) (bool, error) {

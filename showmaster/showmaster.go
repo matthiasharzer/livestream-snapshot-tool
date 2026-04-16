@@ -6,30 +6,41 @@ import (
 )
 
 type ShowMaster struct {
-	LatestClip *Clip
+	historicalClips []*Clip // 0 is the oldest clip, len-1 is the newest clip
+	historySize     int
 }
 
-func New() *ShowMaster {
+func New(historySize int) *ShowMaster {
 	return &ShowMaster{
-		LatestClip: &Clip{},
+		historicalClips: make([]*Clip, 0, historySize),
+		historySize:     historySize,
 	}
 }
 
 func (s *ShowMaster) AddClip(path string) error {
-	// TODO: introduce a different delete strategy once more than one clip is supported
-	oldPath := s.LatestClip.ReplacePath(path)
+	if len(s.historicalClips) == s.historySize {
+		oldestClip := s.historicalClips[0]
+		if err := os.Remove(oldestClip.Path); err != nil {
+			return fmt.Errorf("failed to remove oldest clip: %w", err)
+		}
+		s.historicalClips = s.historicalClips[1:]
+	}
+	clip, err := NewClip(path)
+	if err != nil {
+		return fmt.Errorf("failed to create clip: %w", err)
+	}
+	s.historicalClips = append(s.historicalClips, clip)
+	return nil
+}
 
-	hasOldClip := oldPath != ""
-	didPathChange := oldPath != path
+func (s *ShowMaster) HistorySize() int {
+	return s.historySize
+}
 
-	if !hasOldClip || !didPathChange {
-		// No need to delete the old clip if the path didn't change
+// NthClip returns the nth most recent clip, where n=0 is the most recent clip, n=1 is the second most recent clip, and so on. If n is out of bounds, it returns nil.
+func (s *ShowMaster) NthClip(n int) *Clip {
+	if n < 0 || n >= len(s.historicalClips) {
 		return nil
 	}
-
-	err := os.Remove(oldPath)
-	if err != nil {
-		return fmt.Errorf("failed to remove old clip: %w", err)
-	}
-	return nil
+	return s.historicalClips[len(s.historicalClips)-1-n]
 }
