@@ -20,6 +20,7 @@ var intervalMinutes int
 var httpPort int
 var httpHost string
 var historySize int
+var cookiesFile string
 
 func init() {
 	Command.Flags().StringVarP(&streamURLString, "url", "u", "", "URL of the livestream to snapshot (required)")
@@ -32,6 +33,7 @@ func init() {
 	Command.Flags().IntVarP(&httpPort, "port", "p", 4000, "HTTP server port")
 	Command.Flags().StringVarP(&httpHost, "host", "", "", "HTTP server host (default: all interfaces)")
 	Command.Flags().IntVarP(&historySize, "history-size", "", 1, "Number of historical clips to keep")
+	Command.Flags().StringVarP(&cookiesFile, "cookies-file", "", "", "Path to a file containing cookies for yt-dlp")
 }
 
 var Command = &cobra.Command{
@@ -79,7 +81,7 @@ var Command = &cobra.Command{
 			logging.Info("clip added to master", "filePath", filePath)
 		}
 
-		ripper := stream.NewRipper(*streamURL, interval, outDir, onSegment)
+		ripper := stream.NewRipper(*streamURL, interval, outDir, onSegment, cookiesFile)
 		err = ripper.Start()
 		if err != nil {
 			return fmt.Errorf("failed to start ripper: %w", err)
