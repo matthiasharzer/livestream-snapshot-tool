@@ -81,8 +81,7 @@ func (b *LiveBuffer) clearOutputDir() error {
 	return nil
 }
 
-// Start begins capturing the stream. It runs asynchronously until ctx is canceled.
-func (b *LiveBuffer) Start(ctx context.Context) error {
+func (b *LiveBuffer) startBuffer(ctx context.Context) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -135,27 +134,40 @@ func (b *LiveBuffer) Start(ctx context.Context) error {
 		return fmt.Errorf("yt-dlp failed: %w", err)
 	}
 
+	logging.Info("LiveBuffer: Capture started")
+	return nil
+}
+
+func (b *LiveBuffer) Start(ctx context.Context) error {
+	err := b.startBuffer(ctx)
+	if err != nil {
+		return err
+	}
 	b.isRunning = true
 	b.stopped = make(chan struct{})
-	logging.Info("LiveBuffer: Capture started")
+	defer close(b.stopped)
 
-	go func() {
-		defer close(b.stopped)
-		ytCmdErr := b.ytCmd.Wait()
-		ffmpegStdinErr := b.ffmpegStdin.Close()
-		ffmpegCmdErr := b.ffmpegCmd.Wait()
-		logging.Info("LiveBuffer: Capture stopped.")
-		if ytCmdErr != nil {
-			logging.Error("yt-dlp error", "err", ytCmdErr)
-		}
-		if ffmpegStdinErr != nil {
-			logging.Error("ffmpeg stdin close error", "err", ffmpegStdinErr)
-		}
-		if ffmpegCmdErr != nil {
-			logging.Error("ffmpeg error", "err", ffmpegCmdErr)
-		}
-	}()
+	var resultErrors []error
 
+	ytCmdErr := b.ytCmd.Wait()
+	ffmpegStdinErr := b.ffmpegStdin.Close()
+	ffmpegCmdErr := b.ffmpegCmd.Wait()
+	if ytCmdErr != nil {
+		logging.Error("yt-dlp error", "err", ytCmdErr)
+		resultErrors = append(resultErrors, fmt.Errorf("yt-dlp error: %w", ytCmdErr))
+	}
+	if ffmpegStdinErr != nil {
+		logging.Error("ffmpeg stdin close error", "err", ffmpegStdinErr)
+		resultErrors = append(resultErrors, fmt.Errorf("ffmpeg stdin close error: %w", ffmpegStdinErr))
+	}
+	if ffmpegCmdErr != nil {
+		logging.Error("ffmpeg error", "err", ffmpegCmdErr)
+		resultErrors = append(resultErrors, fmt.Errorf("ffmpeg error: %w", ffmpegCmdErr))
+	}
+	logging.Info("LiveBuffer: Capture stopped")
+	if len(resultErrors) > 0 {
+		return fmt.Errorf("errors during shutdown: %v", resultErrors)
+	}
 	return nil
 }
 

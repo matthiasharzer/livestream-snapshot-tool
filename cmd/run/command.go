@@ -23,6 +23,7 @@ var httpHost string
 var cookiesFile string
 var bufferDirectoryArg string
 var resumeBuffer bool
+var restartOnFailure bool
 
 func init() {
 	Command.Flags().StringVarP(&streamURLString, "url", "u", "", "URL of the livestream to snapshot (required)")
@@ -37,6 +38,7 @@ func init() {
 	Command.Flags().IntVarP(&httpPort, "port", "p", 4000, "HTTP server port")
 	Command.Flags().StringVarP(&httpHost, "host", "", "", "HTTP server host (default: all interfaces)")
 	Command.Flags().StringVarP(&cookiesFile, "cookies-file", "", "", "Path to a file containing cookies for yt-dlp")
+	Command.Flags().BoolVarP(&restartOnFailure, "restart-on-failure", "", false, "Whether to automatically restart the live buffer if it fails (e.g. due to stream interruptions)")
 }
 
 var Command = &cobra.Command{
@@ -78,10 +80,22 @@ var Command = &cobra.Command{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		err = liveBuffer.Start(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to start live buffer: %w", err)
-		}
+		go func() {
+			for {
+				err := liveBuffer.Start(ctx)
+				if err != nil {
+					logging.Error("live buffer error", "err", err)
+				} else {
+					logging.Info("live buffer stopped")
+				}
+				if !restartOnFailure {
+					os.Exit(1)
+					return
+				}
+				logging.Info("restarting live buffer in 5 seconds...")
+				time.Sleep(5 * time.Second)
+			}
+		}()
 		defer liveBuffer.Stop()
 
 		addr := fmt.Sprintf("%s:%d", httpHost, httpPort)
