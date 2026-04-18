@@ -1,4 +1,4 @@
-module github.com/matthiasharzer/livestream-snapshotting-tool
+module github.com/matthiasharzer/livebuffer
 
 go 1.26.2
 

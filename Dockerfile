@@ -19,8 +19,8 @@ RUN go mod download && \
 COPY . .
 
 RUN go build  \
-    -o ../bin/livestream-snapshotting-tool \
-    -ldflags "-X github.com/matthiasharzer/livestream-snapshotting-tool/cmd/version.version=$version"  \
+    -o ../bin/livebuffer \
+    -ldflags "-X github.com/matthiasharzer/livebuffer/cmd/version.version=$version"  \
     ./main.go
 
 FROM alpine:3.23
@@ -28,11 +28,11 @@ FROM alpine:3.23
 RUN apk update && \
 		apk add --no-cache ffmpeg yt-dlp
 
-COPY --from=build /go/bin/livestream-snapshotting-tool /usr/local/bin/livestream-snapshotting-tool
+COPY --from=build /go/bin/livebuffer /usr/local/bin/livebuffer
 
-WORKDIR /var/lib/livestream-snapshotting-tool
+WORKDIR /var/lib/livebuffer
 
 EXPOSE 8080
 
-ENTRYPOINT ["/usr/local/bin/livestream-snapshotting-tool"]
+ENTRYPOINT ["/usr/local/bin/livebuffer"]
 

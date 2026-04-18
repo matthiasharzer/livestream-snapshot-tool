@@ -25,7 +25,7 @@ func TemporaryFileWithEnding(fileEnding string) TempFileOptions {
 func TemporaryFile(options ...TempFileOptions) (string, func(), error) {
 	opts := applyTempFileOptions(options...)
 
-	pattern := "livestream-snapshotting-tool-*"
+	pattern := "livebuffer-*"
 	if opts.FileEnding != "" {
 		pattern += opts.FileEnding
 	}

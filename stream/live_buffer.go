@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/matthiasharzer/livestream-snapshotting-tool/logging"
-	"github.com/matthiasharzer/livestream-snapshotting-tool/util/fsutil"
+	"github.com/matthiasharzer/livebuffer/logging"
+	"github.com/matthiasharzer/livebuffer/util/fsutil"
 )
 
 const DiskRetentionMargin = 5 * time.Minute

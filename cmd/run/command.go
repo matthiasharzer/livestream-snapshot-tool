@@ -9,10 +9,10 @@ import (
 	"os"
 	"time"
 
-	"github.com/matthiasharzer/livestream-snapshotting-tool/api/clip"
-	"github.com/matthiasharzer/livestream-snapshotting-tool/logging"
-	"github.com/matthiasharzer/livestream-snapshotting-tool/stream"
-	"github.com/matthiasharzer/livestream-snapshotting-tool/util/fsutil"
+	"github.com/matthiasharzer/livebuffer/api/clip"
+	"github.com/matthiasharzer/livebuffer/logging"
+	"github.com/matthiasharzer/livebuffer/stream"
+	"github.com/matthiasharzer/livebuffer/util/fsutil"
 	"github.com/spf13/cobra"
 )
 
@@ -41,7 +41,7 @@ func init() {
 
 var Command = &cobra.Command{
 	Use:   "run",
-	Short: "Run the livestream snapshotting server",
+	Short: "Run the livebuffer server",
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		if buffer <= 0 {
 			return errors.New("buffer duration must be greater than 0")
