@@ -78,6 +78,7 @@ var Command = &cobra.Command{
 
 		logging.Info("starting live buffer", "url", streamURLString, "buffer", buffer.String(), "bufferDirectory", bufferDirectory)
 		liveBuffer := stream.NewLiveBuffer(streamURL.String(), buffer, bufferDirectory, resumeBuffer, cookiesFile)
+
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
@@ -86,7 +87,6 @@ var Command = &cobra.Command{
 
 		go func() {
 			defer close(finished)
-			defer liveBuffer.Stop()
 			for {
 				err := liveBuffer.Start(ctx)
 				if err != nil {
@@ -98,8 +98,13 @@ var Command = &cobra.Command{
 					liveBufferErr = err
 					return
 				}
+
 				logging.Info("restarting live buffer in 5 seconds...")
-				time.Sleep(5 * time.Second)
+				select {
+				case <-time.After(5 * time.Second):
+				case <-ctx.Done():
+					return
+				}
 			}
 		}()
 
@@ -110,7 +115,7 @@ var Command = &cobra.Command{
 		mux.HandleFunc("GET /api/v1/clip", clip.Handler(liveBuffer))
 
 		go func() {
-			err = http.ListenAndServe(addr, mux)
+			err := http.ListenAndServe(addr, mux)
 			if err != nil {
 				logging.Fatal("HTTP server error", "err", err)
 			}
