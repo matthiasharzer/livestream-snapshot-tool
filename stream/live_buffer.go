@@ -53,13 +53,38 @@ func NewLiveBuffer(steamURL string, bufferDuration time.Duration, bufferDirector
 	}
 }
 
+func (b *LiveBuffer) playlistFilePath() string {
+	return filepath.Join(b.outputDir, "live.m3u8")
+}
+
+func (b *LiveBuffer) clearOutputDir() error {
+	files, err := os.ReadDir(b.outputDir)
+	if err != nil {
+		return err
+	}
+	err = os.Remove(b.playlistFilePath())
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	for _, file := range files {
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".ts") {
+			continue
+		}
+		err := os.Remove(filepath.Join(b.outputDir, file.Name()))
+		if err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
 // Start begins capturing the stream. It runs asynchronously until ctx is canceled.
 func (b *LiveBuffer) Start(ctx context.Context) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
 	if !b.resume {
-		err := os.RemoveAll(b.outputDir) // Clear old buffer if not resuming
+		err := b.clearOutputDir()
 		if err != nil {
 			logging.Warn("failed to clear old buffer dir", "err", err)
 		}
@@ -82,7 +107,7 @@ func (b *LiveBuffer) Start(ctx context.Context) error {
 		hlsFlags = "delete_segments+append_list"
 	}
 
-	playlistPath := filepath.Join(b.outputDir, "live.m3u8")
+	playlistPath := b.playlistFilePath()
 	b.ffmpegCmd = exec.CommandContext(ctx, "ffmpeg",
 		"-i", "pipe:0",
 		"-c", "copy",
@@ -171,7 +196,7 @@ func (b *LiveBuffer) ExportClip(startAgo, endAgo time.Duration, outputPath strin
 		return fmt.Errorf("failed to get safe segments: %w", err)
 	}
 
-	targetSegments, err := trimSegments(safeSegments, startAgo, endAgo)
+	targetSegments, startTime, err := trimSegments(safeSegments, startAgo, endAgo)
 	if err != nil {
 		return fmt.Errorf("failed to trim segments: %w", err)
 	}
@@ -187,14 +212,22 @@ func (b *LiveBuffer) ExportClip(startAgo, endAgo time.Duration, outputPath strin
 		return fmt.Errorf("failed to create concat file: %w", err)
 	}
 
+	trimDuration := startAgo - endAgo
+
+	absOutputPath, err := filepath.Abs(outputPath)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute output path: %w", err)
+	}
+
 	mergeCmd := exec.Command("ffmpeg", "-y",
 		"-f", "concat",
 		"-safe", "0",
 		"-i", concatFile,
+		"-ss", fmt.Sprintf("%.3f", startTime.Seconds()),
+		"-t", fmt.Sprintf("%.3f", trimDuration.Seconds()),
 		"-c", "copy", // No re-encoding, extremely fast
-		outputPath,
+		absOutputPath,
 	)
-	//mergeCmd.Dir = b.outputDir // Run inside the buffer dir so relative paths work
 
 	if err := mergeCmd.Run(); err != nil {
 		return fmt.Errorf("failed to merge clip: %w", err)
@@ -204,7 +237,7 @@ func (b *LiveBuffer) ExportClip(startAgo, endAgo time.Duration, outputPath strin
 }
 
 func (b *LiveBuffer) getSafeHlsSegments() ([]hlsSegment, error) {
-	playlistPath := filepath.Join(b.outputDir, "live.m3u8")
+	playlistPath := b.playlistFilePath()
 
 	file, err := os.Open(playlistPath)
 	if err != nil {
@@ -218,7 +251,11 @@ func (b *LiveBuffer) getSafeHlsSegments() ([]hlsSegment, error) {
 	for scanner.Scan() {
 		line := scanner.Text()
 		if strings.HasPrefix(line, "#EXTINF:") {
-			parsed, _ := strconv.ParseFloat(strings.TrimPrefix(strings.TrimSuffix(line, ","), "#EXTINF:"), 64)
+			parsed, err := strconv.ParseFloat(strings.TrimPrefix(strings.TrimSuffix(line, ","), "#EXTINF:"), 64)
+			if err != nil {
+				logging.Warn("failed to parse segment duration from playlist", "line", line, "err", err)
+				continue
+			}
 			currentDuration = parsed
 		} else if strings.HasSuffix(line, ".ts") {
 			segments = append(segments, hlsSegment{
@@ -226,6 +263,9 @@ func (b *LiveBuffer) getSafeHlsSegments() ([]hlsSegment, error) {
 				duration: time.Duration(currentDuration * float64(time.Second)),
 			})
 		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read playlist: %w", err)
 	}
 
 	if len(segments) < 2 {
@@ -237,7 +277,10 @@ func (b *LiveBuffer) getSafeHlsSegments() ([]hlsSegment, error) {
 }
 
 func (b *LiveBuffer) concatInto(segments []hlsSegment, concatFilePath string) error {
-	concatFile, _ := os.Create(concatFilePath)
+	concatFile, err := os.Create(concatFilePath)
+	if err != nil {
+		return fmt.Errorf("failed to create concat file: %w", err)
+	}
 	defer concatFile.Close()
 	for _, segment := range segments {
 		// Format required by ffmpeg concat demuxer
@@ -246,7 +289,8 @@ func (b *LiveBuffer) concatInto(segments []hlsSegment, concatFilePath string) er
 		if err != nil {
 			return fmt.Errorf("failed to get absolute path for segment: %w", err)
 		}
-		_, err = fmt.Fprintf(concatFile, "file '%s'\n", absFilePath)
+		escapedFilePath := strings.ReplaceAll(absFilePath, "'", "'\\''")
+		_, err = fmt.Fprintf(concatFile, "file '%s'\n", escapedFilePath)
 		if err != nil {
 			return fmt.Errorf("failed to write to concat file: %w", err)
 		}
@@ -254,31 +298,35 @@ func (b *LiveBuffer) concatInto(segments []hlsSegment, concatFilePath string) er
 	return nil
 }
 
-func trimSegments(safeSegments []hlsSegment, startAgo time.Duration, endAgo time.Duration) ([]hlsSegment, error) {
+func trimSegments(safeSegments []hlsSegment, startAgo time.Duration, endAgo time.Duration) ([]hlsSegment, time.Duration, error) {
 	var totalSafeTime time.Duration
 	for _, seg := range safeSegments {
 		totalSafeTime += seg.duration
 	}
 
 	var targetSegments []hlsSegment
-	currentTime := totalSafeTime // Represents "now" (relative to the safe buffer)
+	var currentTime time.Duration
+	var startTime time.Duration
+
+	targetStart := totalSafeTime - startAgo
+	targetEnd := totalSafeTime - endAgo
 
 	for _, seg := range safeSegments {
-		segmentStartTime := currentTime - totalSafeTime
-		segmentEndTime := segmentStartTime + seg.duration
-
-		targetStart := totalSafeTime - startAgo
-		targetEnd := totalSafeTime - endAgo
+		segmentStartTime := currentTime
+		segmentEndTime := currentTime + seg.duration
 
 		if segmentEndTime > targetStart && segmentStartTime < targetEnd {
+			if len(targetSegments) == 0 {
+				startTime = max(targetStart-segmentStartTime, 0)
+			}
 			targetSegments = append(targetSegments, seg)
 		}
-		totalSafeTime -= seg.duration
+		currentTime += seg.duration
 	}
 
 	if len(targetSegments) == 0 {
-		return nil, fmt.Errorf("requested timeframe is outside the current buffer window")
+		return nil, 0, fmt.Errorf("requested timeframe is outside the current buffer window")
 	}
 
-	return targetSegments, nil
+	return targetSegments, startTime, nil
 }

@@ -34,7 +34,7 @@ func Handler(buffer *stream.LiveBuffer) http.HandlerFunc {
 
 		tempMp4Path, cleanup, err := fsutil.TemporaryFile(fsutil.TemporaryFileWithEnding(".mp4"))
 		if err != nil {
-			logging.Error("failed to create temp file: %v", err)
+			logging.Error("failed to create temp file", "err", err)
 			http.Error(w, "internal Server Error", http.StatusInternalServerError)
 			return
 		}
@@ -42,8 +42,8 @@ func Handler(buffer *stream.LiveBuffer) http.HandlerFunc {
 
 		err = buffer.ExportClip(startAgo, endAgo, tempMp4Path)
 		if err != nil {
-			logging.Error("failed to export clip: %v", err)
-			http.Error(w, fmt.Sprintf("failed to generate clip: %v", err), http.StatusRequestedRangeNotSatisfiable)
+			logging.Error("failed to export clip", "err", err)
+			http.Error(w, "failed to generate clip", http.StatusRequestedRangeNotSatisfiable)
 			return
 		}
 
