@@ -42,9 +42,9 @@ type LiveBuffer struct {
 	isRunning   bool
 }
 
-func NewLiveBuffer(steamURL string, bufferDuration time.Duration, bufferDirectory string, keepOldFiles bool, cookieFile string) *LiveBuffer {
+func NewLiveBuffer(streamURL string, bufferDuration time.Duration, bufferDirectory string, keepOldFiles bool, cookieFile string) *LiveBuffer {
 	return &LiveBuffer{
-		url:             steamURL,
+		url:             streamURL,
 		bufferDuration:  bufferDuration,
 		segmentDuration: 60 * time.Second,
 		outputDir:       bufferDirectory,
