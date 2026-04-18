@@ -7,11 +7,11 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/matthiasharzer/livestream-snapshotting-tool/api/clip"
-	"github.com/matthiasharzer/livestream-snapshotting-tool/logging"
-	"github.com/matthiasharzer/livestream-snapshotting-tool/showmaster"
-	"github.com/matthiasharzer/livestream-snapshotting-tool/stream"
-	"github.com/matthiasharzer/livestream-snapshotting-tool/util/fsutil"
+	"github.com/matthiasharzer/livebuffer/api/clip"
+	"github.com/matthiasharzer/livebuffer/logging"
+	"github.com/matthiasharzer/livebuffer/showmaster"
+	"github.com/matthiasharzer/livebuffer/stream"
+	"github.com/matthiasharzer/livebuffer/util/fsutil"
 	"github.com/spf13/cobra"
 )
 

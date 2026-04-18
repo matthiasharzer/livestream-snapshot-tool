@@ -3,7 +3,7 @@ package fsutil
 import "os"
 
 func TemporaryFile() (string, func(), error) {
-	file, err := os.CreateTemp("", "livestream-snapshotting-tool-")
+	file, err := os.CreateTemp("", "livebuffer-")
 	if err != nil {
 		return "", nil, err
 	}

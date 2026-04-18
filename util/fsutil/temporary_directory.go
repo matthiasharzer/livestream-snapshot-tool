@@ -5,7 +5,7 @@ import (
 )
 
 func TemporaryDirectory() (string, func(), error) {
-	dir, err := os.MkdirTemp("", "livestream-snapshotting-tool-*")
+	dir, err := os.MkdirTemp("", "livebuffer-*")
 	if err != nil {
 		return "", nil, err
 	}
