@@ -116,7 +116,6 @@ func (b *LiveBuffer) Start(ctx context.Context) error {
 		"-c", "copy",
 		"-f", "hls",
 		"-hls_time", strconv.Itoa(int(b.segmentDuration.Seconds())),
-		// ffmpeg now keeps 65 files on disk
 		"-hls_list_size", strconv.Itoa(listSize),
 		"-hls_flags", hlsFlags,
 		playlistPath,
@@ -186,7 +185,7 @@ func (b *LiveBuffer) Stop() {
 
 // ExportClip safely extracts a timeframe and merges it into a valid .mp4 file.
 // startAgo and endAgo represent how far back in time to grab (e.g., 30m ago to 10m ago).
-func (b *LiveBuffer) ExportClip(startAgo, endAgo time.Duration, outputPath string) error {
+func (b *LiveBuffer) ExportClip(ctx context.Context, startAgo, endAgo time.Duration, outputPath string) error {
 	if startAgo > b.BufferDuration {
 		return fmt.Errorf("requested timeframe exceeds the allowed logical buffer of %v", b.BufferDuration)
 	}
@@ -222,7 +221,7 @@ func (b *LiveBuffer) ExportClip(startAgo, endAgo time.Duration, outputPath strin
 		return fmt.Errorf("failed to get absolute output path: %w", err)
 	}
 
-	mergeCmd := exec.Command("ffmpeg", "-y",
+	mergeCmd := exec.CommandContext(ctx, "ffmpeg", "-y",
 		"-f", "concat",
 		"-safe", "0",
 		"-i", concatFile,

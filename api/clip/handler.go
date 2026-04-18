@@ -53,14 +53,14 @@ func Handler(buffer *stream.LiveBuffer) http.HandlerFunc {
 		}
 		defer cleanup()
 
-		err = buffer.ExportClip(startAgo, endAgo, tempMp4Path)
+		err = buffer.ExportClip(r.Context(), startAgo, endAgo, tempMp4Path)
 		if err != nil {
 			logging.Error("failed to export clip", "err", err)
-			http.Error(w, "failed to generate clip", http.StatusRequestedRangeNotSatisfiable)
+			http.Error(w, "failed to generate clip", http.StatusInternalServerError)
 			return
 		}
 
-		filename := fmt.Sprintf("clip_%s_to_%s.mp4", startStr, endStr)
+		filename := fmt.Sprintf("clip_%s_to_%s.mp4", startAgo.String(), endAgo.String())
 
 		w.Header().Set("Content-Type", "video/mp4")
 		w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", filename))
