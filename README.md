@@ -14,7 +14,7 @@ Create a `docker-compose.yml` file and start it with `docker compose up -d`. Mak
 
 ```yaml
 services:
-	livebuffer:
+  livebuffer:
     image: ghcr.io/matthiasharzer/livebuffer:latest
     container_name: livebuffer
     restart: unless-stopped
