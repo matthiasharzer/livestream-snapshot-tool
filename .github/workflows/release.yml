@@ -79,7 +79,7 @@ jobs:
           provenance: mode=max
           push: true
           tags: |
-            ghcr.io/matthiasharzer/livestream-snapshotting-tool:latest
-            ghcr.io/matthiasharzer/livestream-snapshotting-tool:${{ needs.get-next-version.outputs.version }}
+            ghcr.io/matthiasharzer/livebuffer:latest
+            ghcr.io/matthiasharzer/livebuffer:${{ needs.get-next-version.outputs.version }}
           build-args: |
             version=v${{ needs.get-next-version.outputs.version }}

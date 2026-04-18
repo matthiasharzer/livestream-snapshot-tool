@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/matthiasharzer/livestream-snapshotting-tool/showmaster"
-	"github.com/matthiasharzer/livestream-snapshotting-tool/util/fsutil"
+	"github.com/matthiasharzer/livebuffer/showmaster"
+	"github.com/matthiasharzer/livebuffer/util/fsutil"
 )
 
 func resolveClipNumber(clipText string) (int, error) {
