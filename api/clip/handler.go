@@ -32,6 +32,19 @@ func Handler(buffer *stream.LiveBuffer) http.HandlerFunc {
 			return
 		}
 
+		if startAgo < 0 || endAgo < 0 {
+			http.Error(w, "'start' and 'end' must be non-negative durations", http.StatusBadRequest)
+			return
+		}
+		if startAgo > buffer.BufferDuration {
+			http.Error(w, fmt.Sprintf("requested timeframe exceeds the allowed logical buffer of %v", buffer.BufferDuration), http.StatusRequestedRangeNotSatisfiable)
+			return
+		}
+		if startAgo <= endAgo {
+			http.Error(w, "start time must be older than end time", http.StatusBadRequest)
+			return
+		}
+
 		tempMp4Path, cleanup, err := fsutil.TemporaryFile(fsutil.TemporaryFileWithEnding(".mp4"))
 		if err != nil {
 			logging.Error("failed to create temp file", "err", err)

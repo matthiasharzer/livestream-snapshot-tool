@@ -27,8 +27,8 @@ type hlsSegment struct {
 
 // LiveBuffer manages a rolling HLS buffer of a livestream.
 type LiveBuffer struct {
+	BufferDuration  time.Duration
 	url             string
-	bufferDuration  time.Duration
 	segmentDuration time.Duration
 	outputDir       string
 	resume          bool
@@ -45,7 +45,7 @@ type LiveBuffer struct {
 func NewLiveBuffer(streamURL string, bufferDuration time.Duration, bufferDirectory string, keepOldFiles bool, cookieFile string) *LiveBuffer {
 	return &LiveBuffer{
 		url:             streamURL,
-		bufferDuration:  bufferDuration,
+		BufferDuration:  bufferDuration,
 		segmentDuration: 60 * time.Second,
 		outputDir:       bufferDirectory,
 		resume:          keepOldFiles,
@@ -60,6 +60,9 @@ func (b *LiveBuffer) playlistFilePath() string {
 func (b *LiveBuffer) clearOutputDir() error {
 	files, err := os.ReadDir(b.outputDir)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil // Nothing to clear
+		}
 		return err
 	}
 	err = os.Remove(b.playlistFilePath())
@@ -93,7 +96,7 @@ func (b *LiveBuffer) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to create buffer dir: %w", err)
 	}
 
-	physicalDuration := b.bufferDuration + DiskRetentionMargin
+	physicalDuration := b.BufferDuration + DiskRetentionMargin
 	listSize := int(physicalDuration.Seconds() / b.segmentDuration.Seconds())
 
 	b.ytCmd = exec.CommandContext(ctx, "yt-dlp", "-q", "-o", "-", b.url)
@@ -135,7 +138,7 @@ func (b *LiveBuffer) Start(ctx context.Context) error {
 
 	b.isRunning = true
 	b.stopped = make(chan struct{})
-	logging.Info("LiveBuffer: Capture started.")
+	logging.Info("LiveBuffer: Capture started")
 
 	go func() {
 		defer close(b.stopped)
@@ -184,8 +187,8 @@ func (b *LiveBuffer) Stop() {
 // ExportClip safely extracts a timeframe and merges it into a valid .mp4 file.
 // startAgo and endAgo represent how far back in time to grab (e.g., 30m ago to 10m ago).
 func (b *LiveBuffer) ExportClip(startAgo, endAgo time.Duration, outputPath string) error {
-	if startAgo > b.bufferDuration {
-		return fmt.Errorf("requested timeframe exceeds the allowed logical buffer of %v", b.bufferDuration)
+	if startAgo > b.BufferDuration {
+		return fmt.Errorf("requested timeframe exceeds the allowed logical buffer of %v", b.BufferDuration)
 	}
 	if startAgo <= endAgo {
 		return fmt.Errorf("start time must be older than end time")
