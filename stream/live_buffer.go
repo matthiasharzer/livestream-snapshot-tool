@@ -134,8 +134,32 @@ func (b *LiveBuffer) startBuffer(ctx context.Context) error {
 		return fmt.Errorf("yt-dlp failed: %w", err)
 	}
 
+	b.isRunning = true
+	b.stopped = make(chan struct{})
+
 	logging.Info("LiveBuffer: Capture started")
 	return nil
+}
+
+func (b *LiveBuffer) shutdownBuffer() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	if !b.isRunning {
+		return
+	}
+
+	logging.Info("LiveBuffer: Shutting down capture...")
+
+	if b.ytCmd != nil && b.ytCmd.Process != nil {
+		b.ytCmd.Process.Signal(os.Interrupt)
+	}
+
+	if b.ffmpegStdin != nil {
+		b.ffmpegStdin.Close()
+	}
+
+	b.isRunning = false
 }
 
 func (b *LiveBuffer) Start(ctx context.Context) error {
@@ -143,15 +167,16 @@ func (b *LiveBuffer) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	b.isRunning = true
-	b.stopped = make(chan struct{})
+
 	defer close(b.stopped)
+	defer b.shutdownBuffer()
 
 	var resultErrors []error
 
 	ytCmdErr := b.ytCmd.Wait()
 	ffmpegStdinErr := b.ffmpegStdin.Close()
 	ffmpegCmdErr := b.ffmpegCmd.Wait()
+
 	if ytCmdErr != nil {
 		logging.Error("yt-dlp error", "err", ytCmdErr)
 		resultErrors = append(resultErrors, fmt.Errorf("yt-dlp error: %w", ytCmdErr))
@@ -166,32 +191,14 @@ func (b *LiveBuffer) Start(ctx context.Context) error {
 	}
 	logging.Info("LiveBuffer: Capture stopped")
 	if len(resultErrors) > 0 {
-		return fmt.Errorf("errors during shutdown: %v", resultErrors)
+		return fmt.Errorf("errors during shutdown: %v", errors.Join(resultErrors...))
 	}
 	return nil
 }
 
 // Stop gracefully terminates the stream capture and blocks until all files are finalized.
 func (b *LiveBuffer) Stop() {
-	b.mu.Lock()
-	if !b.isRunning {
-		b.mu.Unlock()
-		return
-	}
-	b.isRunning = false
-
-	logging.Info("LiveBuffer: Initiating graceful shutdown...")
-
-	if b.ytCmd != nil && b.ytCmd.Process != nil {
-		b.ytCmd.Process.Signal(os.Interrupt)
-	}
-
-	if b.ffmpegStdin != nil {
-		b.ffmpegStdin.Close()
-	}
-
-	b.mu.Unlock()
-
+	b.shutdownBuffer()
 	<-b.stopped
 }
 

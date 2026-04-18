@@ -44,6 +44,7 @@ func init() {
 var Command = &cobra.Command{
 	Use:   "run",
 	Short: "Run the livebuffer server",
+
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		if buffer <= 0 {
 			return errors.New("buffer duration must be greater than 0")
@@ -80,7 +81,12 @@ var Command = &cobra.Command{
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
+		finished := make(chan struct{})
+		var liveBufferErr error
+
 		go func() {
+			defer close(finished)
+			defer liveBuffer.Stop()
 			for {
 				err := liveBuffer.Start(ctx)
 				if err != nil {
@@ -89,14 +95,13 @@ var Command = &cobra.Command{
 					logging.Info("live buffer stopped")
 				}
 				if !restartOnFailure {
-					os.Exit(1)
+					liveBufferErr = err
 					return
 				}
 				logging.Info("restarting live buffer in 5 seconds...")
 				time.Sleep(5 * time.Second)
 			}
 		}()
-		defer liveBuffer.Stop()
 
 		addr := fmt.Sprintf("%s:%d", httpHost, httpPort)
 
@@ -104,9 +109,18 @@ var Command = &cobra.Command{
 		mux := http.NewServeMux()
 		mux.HandleFunc("GET /api/v1/clip", clip.Handler(liveBuffer))
 
-		err = http.ListenAndServe(addr, mux)
-		if err != nil {
-			return fmt.Errorf("failed to start HTTP server: %w", err)
+		go func() {
+			err = http.ListenAndServe(addr, mux)
+			if err != nil {
+				logging.Fatal("HTTP server error", "err", err)
+			}
+		}()
+
+		<-finished
+
+		if liveBufferErr != nil {
+			cmd.SilenceUsage = true
+			return fmt.Errorf("live buffer error: %w", liveBufferErr)
 		}
 
 		return nil
