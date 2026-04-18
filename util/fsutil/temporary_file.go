@@ -2,8 +2,35 @@ package fsutil
 
 import "os"
 
-func TemporaryFile() (string, func(), error) {
-	file, err := os.CreateTemp("", "livebuffer-")
+type TempFileOptions struct {
+	FileEnding string
+}
+
+func applyTempFileOptions(opts ...TempFileOptions) TempFileOptions {
+	var merged TempFileOptions
+	for _, opt := range opts {
+		if opt.FileEnding != "" {
+			merged.FileEnding = opt.FileEnding
+		}
+	}
+	return merged
+}
+
+func TemporaryFileWithEnding(fileEnding string) TempFileOptions {
+	return TempFileOptions{
+		FileEnding: fileEnding,
+	}
+}
+
+func TemporaryFile(options ...TempFileOptions) (string, func(), error) {
+	opts := applyTempFileOptions(options...)
+
+	pattern := "livebuffer-*"
+	if opts.FileEnding != "" {
+		pattern += opts.FileEnding
+	}
+
+	file, err := os.CreateTemp("", pattern)
 	if err != nil {
 		return "", nil, err
 	}

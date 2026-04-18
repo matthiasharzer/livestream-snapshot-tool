@@ -3,63 +3,68 @@ package clip
 import (
 	"fmt"
 	"net/http"
-	"strconv"
+	"time"
 
-	"github.com/matthiasharzer/livebuffer/showmaster"
+	"github.com/matthiasharzer/livebuffer/logging"
+	"github.com/matthiasharzer/livebuffer/stream"
 	"github.com/matthiasharzer/livebuffer/util/fsutil"
 )
 
-func resolveClipNumber(clipText string) (int, error) {
-	if clipText == "latest" {
-		return 0, nil
-	}
-
-	clipNr, err := strconv.Atoi(clipText)
-	if err != nil {
-		return 0, fmt.Errorf("failed to convert %s to integer: %v", clipText, err)
-	}
-
-	return clipNr, nil
-}
-
-func Handler(master *showmaster.ShowMaster) http.HandlerFunc {
+func Handler(buffer *stream.LiveBuffer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		clip := r.PathValue("clip")
+		startStr := r.URL.Query().Get("start")
+		endStr := r.URL.Query().Get("end")
 
-		clipNr, err := resolveClipNumber(clip)
+		if startStr == "" || endStr == "" {
+			http.Error(w, "missing 'start' or 'end' query parameters (e.g., ?start=15m&end=5m)", http.StatusBadRequest)
+			return
+		}
+
+		startAgo, err := time.ParseDuration(startStr)
 		if err != nil {
-			http.Error(w, "invalid clip number", http.StatusBadRequest)
+			http.Error(w, "invalid 'start' format. Use Go duration strings (e.g., 2m, 30s)", http.StatusBadRequest)
 			return
 		}
 
-		if clipNr < 0 || clipNr >= master.HistorySize() {
-			http.Error(w, "clip number out of bounds", http.StatusBadRequest)
-			return
-		}
-
-		requestedClip := master.NthClip(clipNr)
-		if requestedClip == nil {
-			http.Error(w, "clip unavailable", http.StatusNotFound)
-			return
-		}
-
-		tempFile, cleanup, err := fsutil.TemporaryFile()
+		endAgo, err := time.ParseDuration(endStr)
 		if err != nil {
-			http.Error(w, "failed to create temporary file", http.StatusInternalServerError)
+			http.Error(w, "invalid 'end' format. Use Go duration strings (e.g., 2m, 30s)", http.StatusBadRequest)
+			return
+		}
+
+		if startAgo < 0 || endAgo < 0 {
+			http.Error(w, "'start' and 'end' must be non-negative durations", http.StatusBadRequest)
+			return
+		}
+		if startAgo > buffer.BufferDuration {
+			http.Error(w, fmt.Sprintf("requested timeframe exceeds the allowed logical buffer of %v", buffer.BufferDuration), http.StatusRequestedRangeNotSatisfiable)
+			return
+		}
+		if startAgo <= endAgo {
+			http.Error(w, "start time must be older than end time", http.StatusBadRequest)
+			return
+		}
+
+		tempMp4Path, cleanup, err := fsutil.TemporaryFile(fsutil.TemporaryFileWithEnding(".mp4"))
+		if err != nil {
+			logging.Error("failed to create temp file", "err", err)
+			http.Error(w, "internal Server Error", http.StatusInternalServerError)
 			return
 		}
 		defer cleanup()
 
-		hasPath, err := requestedClip.CopyTo(tempFile)
+		err = buffer.ExportClip(r.Context(), startAgo, endAgo, tempMp4Path)
 		if err != nil {
-			http.Error(w, "failed to copy clip to temporary file", http.StatusInternalServerError)
-			return
-		}
-		if !hasPath {
-			http.Error(w, "no clip available", http.StatusNotFound)
+			logging.Error("failed to export clip", "err", err)
+			http.Error(w, "failed to generate clip", http.StatusInternalServerError)
 			return
 		}
 
-		http.ServeFile(w, r, tempFile)
+		filename := fmt.Sprintf("clip_%s_to_%s.mp4", startAgo.String(), endAgo.String())
+
+		w.Header().Set("Content-Type", "video/mp4")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=\"%s\"", filename))
+
+		http.ServeFile(w, r, tempMp4Path)
 	}
 }
