@@ -81,8 +81,7 @@ func (b *LiveBuffer) clearOutputDir() error {
 	return nil
 }
 
-// Start begins capturing the stream. It runs asynchronously until ctx is canceled.
-func (b *LiveBuffer) Start(ctx context.Context) error {
+func (b *LiveBuffer) startBuffer(ctx context.Context) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -137,38 +136,20 @@ func (b *LiveBuffer) Start(ctx context.Context) error {
 
 	b.isRunning = true
 	b.stopped = make(chan struct{})
+
 	logging.Info("LiveBuffer: Capture started")
-
-	go func() {
-		defer close(b.stopped)
-		ytCmdErr := b.ytCmd.Wait()
-		ffmpegStdinErr := b.ffmpegStdin.Close()
-		ffmpegCmdErr := b.ffmpegCmd.Wait()
-		logging.Info("LiveBuffer: Capture stopped.")
-		if ytCmdErr != nil {
-			logging.Error("yt-dlp error", "err", ytCmdErr)
-		}
-		if ffmpegStdinErr != nil {
-			logging.Error("ffmpeg stdin close error", "err", ffmpegStdinErr)
-		}
-		if ffmpegCmdErr != nil {
-			logging.Error("ffmpeg error", "err", ffmpegCmdErr)
-		}
-	}()
-
 	return nil
 }
 
-// Stop gracefully terminates the stream capture and blocks until all files are finalized.
-func (b *LiveBuffer) Stop() {
+func (b *LiveBuffer) shutdownBuffer() {
 	b.mu.Lock()
+	defer b.mu.Unlock()
+
 	if !b.isRunning {
-		b.mu.Unlock()
 		return
 	}
-	b.isRunning = false
 
-	logging.Info("LiveBuffer: Initiating graceful shutdown...")
+	logging.Info("LiveBuffer: Shutting down capture...")
 
 	if b.ytCmd != nil && b.ytCmd.Process != nil {
 		b.ytCmd.Process.Signal(os.Interrupt)
@@ -178,9 +159,41 @@ func (b *LiveBuffer) Stop() {
 		b.ffmpegStdin.Close()
 	}
 
-	b.mu.Unlock()
+	b.isRunning = false
+}
 
-	<-b.stopped
+func (b *LiveBuffer) Start(ctx context.Context) error {
+	err := b.startBuffer(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer close(b.stopped)
+	defer b.shutdownBuffer()
+
+	var resultErrors []error
+
+	ytCmdErr := b.ytCmd.Wait()
+	ffmpegStdinErr := b.ffmpegStdin.Close()
+	ffmpegCmdErr := b.ffmpegCmd.Wait()
+
+	if ytCmdErr != nil {
+		logging.Error("yt-dlp error", "err", ytCmdErr)
+		resultErrors = append(resultErrors, fmt.Errorf("yt-dlp error: %w", ytCmdErr))
+	}
+	if ffmpegStdinErr != nil && !errors.Is(ffmpegStdinErr, os.ErrClosed) {
+		logging.Error("ffmpeg stdin close error", "err", ffmpegStdinErr)
+		resultErrors = append(resultErrors, fmt.Errorf("ffmpeg stdin close error: %w", ffmpegStdinErr))
+	}
+	if ffmpegCmdErr != nil {
+		logging.Error("ffmpeg error", "err", ffmpegCmdErr)
+		resultErrors = append(resultErrors, fmt.Errorf("ffmpeg error: %w", ffmpegCmdErr))
+	}
+	logging.Info("LiveBuffer: Capture stopped")
+	if len(resultErrors) > 0 {
+		return fmt.Errorf("errors during shutdown: %w", errors.Join(resultErrors...))
+	}
+	return nil
 }
 
 // ExportClip safely extracts a timeframe and merges it into a valid .mp4 file.
