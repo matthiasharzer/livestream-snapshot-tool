@@ -1,5 +1,5 @@
-# Livestream Snapshotting Tool
-A simple Go-based tool for snapshotting livestreams into segments and providing them via a REST API.
+# livestream-snapshotting-tool
+A simple Go-based tool for buffering livestreams and providing flexible access to stream clips via a REST API.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 <br>
@@ -21,10 +21,10 @@ services:
     ports:
       - "4000:4000"
 
-    command: run --port 4000 --interval 60 --history-size 24 --url https://www.youtube.com/watch?v=W0V8-6WrgBY
+    command: run --port 4000 --buffer 10m --url https://www.youtube.com/watch?v=W0V8-6WrgBY
 ```
 > [!NOTE]
-> This example will snapshot the specified YouTube livestream every 60 minutes, keeping a history of the last 24 snapshots.
+> This example will buffer the last 10 minutes of the livestream. Adjust the `--buffer` parameter as needed. See the [command-line flags](#usage) for more options.
 
 #### Docker CLI
 ```bash
@@ -32,26 +32,42 @@ docker run -d \
 	--name livestream-snapshotting-tool \
 	-p 4000:4000 \
 	ghcr.io/matthiasharzer/livestream-snapshotting-tool:latest \
-	run --port 4000 --interval 60 --history-size 24 --url https://www.youtube.com/watch?v=W0V8-6WrgBY
+	run --port 4000 --buffer 10m --url https://www.youtube.com/watch?v=W0V8-6WrgBY
 ```
 
 ### Binary
 Download the [latest release](https://github.com/matthiasharzer/livestream-snapshotting-tool/releases/latest) for your platform and run it with the appropriate command-line arguments.
 
 ## Usage
+
+### `run` Command
 Start the tool with:
 ```bash
-./livestream-snapshotting-tool run --port 4000 --interval 60 --history-size 24 --url https://www.youtube.com/watch?v=W0V8-6WrgBY
+./livestream-snapshotting-tool run --port 4000 --buffer 10m --url https://www.youtube.com/watch?v=W0V8-6WrgBY
 ```
 
-| Flag                | Required | Default               | Description                                                                                                                                                                                                                                      |
-|---------------------|----------|-----------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `-u` / `--url`      | ✅       | /                     | The URL of the livestream to snapshot.                                                                                                                                                                                                           |
-| `-p` / `--port`     | ❌       | 4000                  | The port on which the REST API will be available.                                                                                                                                                                                                |
-| `--host`            | ❌       | `""` (all interfaces) | The host/IP address on which the REST API will listen.                                                                                                                                                                                           |
-| `-i` / `--interval` | ❌       | 10                    | The interval (in minutes) at which to snapshot the livestream.                                                                                                                                                                                   |
-| `--history-size`    | ❌       | 1                     | The number of snapshots to keep in history. Must be `>=1`                                                                                                                                                                                        |
-| `--cookies-file`    | ❌       | `""`                  | Path to a cookies file (in Netscape format) for authenticated access. Will be passed as the `--cookies` flag to `yt-dlp`. See the [`yt-dlp` FAQ](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp) for further details. |
+#### Command-Line Flags
 
-## API Endpoints
-- `GET /api/v1/clip/{clip}`: Returns the n-th most recent snapshot, where `clip=0` is the most recent. Use instead `clip=latest` to always get the most recent snapshot. Returns the video clip in MP4 format.
+| Flag              | Required | Default               | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+|-------------------|----------|-----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `-u` / `--url`    | ✅       | /                     | The URL of the livestream to snapshot.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `-p` / `--port`   | ❌       | 4000                  | The port on which the REST API will be available.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `--host`          | ❌       | `""` (all interfaces) | The host/IP address on which the REST API will listen.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `-b` / `--buffer` | ❌       | 10m                   | The duration of the buffer, i.e., how much of the most recent livestream to keep available for snapshotting. Must be in a format parsable by [Go's `time.ParseDuration`](https://pkg.go.dev/time#ParseDuration) (e.g., `10m` for 10 minutes). Valid units are "ns", "us" (or "µs"), "ms", "s", "m", "h".                                                                                                                                                                                                                                                                         |
+| `--buffer-dir`    | ❌       | _temporary directory_ | The directory where the livestream buffer will be stored. By default, a temporary directory will be created and used. If you want to persist the buffer across restarts, specify a directory here (e.g., `/data/buffer`).                                                                                                                                                                                                                                                                                                                                                        |
+| `--resume-buffer` | ❌       | false                 | Whether to attempt to resume the buffer from the specified `--buffer-dir` on startup. If enabled and a valid buffer is found in the directory, it will be loaded and used instead of starting with an empty buffer. This allows for continuity across restarts, but should only be used if you are sure that the buffer directory contains a valid and consistent buffer state. This may also create unwanted video jumps, since newly recorded video will be appended to the existing buffer, which may contain old video from a previous livestream session. Use with caution. |
+| `--cookies-file`  | ❌       | `""`                  | Path to a cookies file (in Netscape format) for authenticated access. Will be passed as the `--cookies` flag to `yt-dlp`. See the [`yt-dlp` FAQ](https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp) for further details.                                                                                                                                                                                                                                                                                                                                 |
+
+#### API Endpoints
+| Method | Endpoint                               | Description                                                                                                                                                                                                                                                              |
+|--------|----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| GET    | `/api/v1/clip?start={start}&end={end}` | Request a clip of the livestream between the specified start and end times, in positive duration format.  For example, `start=5m&end=0s` would request a clip of the last 5 minutes of the livestream. The response will be a video file containing the requested clip.. |
+
+### `version` Command
+Print the version of the tool:
+```bash
+./livestream-snapshotting-tool version
+```
+
+## License
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details
